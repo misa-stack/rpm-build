@@ -91,3 +91,12 @@ DNF installation and updates (WIP)
 ## Credits
 
 All credit for the browser itself goes to the [Zen Browser](https://github.com/zen-browser/desktop) and Mozilla developers. This project only provides an unofficial RPM build and packaging workflow.
+
+<!-- README mascot -->
+<p align="center">
+  <a href="https://commons.wikimedia.org/wiki/File:Cute-girl.svg">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Cute-girl.svg/500px-Cute-girl.svg.png" alt="Anime girl with a tablet" width="220">
+  </a>
+  <br>
+  <sub>Art by <a href="https://commons.wikimedia.org/wiki/File:Cute-girl.svg">bogdan</a> · <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a></sub>
+</p>

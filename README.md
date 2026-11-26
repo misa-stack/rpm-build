@@ -13,17 +13,17 @@ This is a small personal project, not an official Zen Browser repository.
 - The GitHub Pages repository and DNF metadata are published, but installation and updates through the repository still need debugging.
 - Automatic detection of new upstream releases is not implemented yet.
 
-Currently targeting Fedora 44 on x86_64. Packages are unsigned.
+Targeting Fedora 44 and Fedora 45 on x86_64. Fedora 45 support and repository installation checks are being validated by the new build pipeline. Packages are unsigned.
 
 ## Manual installation (working)
 
-Download the `zen-browser-rpm` artifact from a successful [build on GitHub Actions](https://github.com/misa-stack/rpm-build/actions/workflows/build.yml). Extract the ZIP file and run the following in the directory containing the RPM:
+Download the `zen-browser-rpm-fc44` or `zen-browser-rpm-fc45` artifact (matching your Fedora version) from a successful [build on GitHub Actions](https://github.com/misa-stack/rpm-build/actions/workflows/build.yml). Extract the ZIP file and run the following in the directory containing the RPM:
 
 ```bash
 sudo dnf install ./zen-browser-*.rpm
 ```
 
-You can also download the current build using GitHub CLI (requires authentication):
+The original Fedora 44 build can also be downloaded using GitHub CLI (requires authentication):
 
 ```bash
 gh run download 45840127714 --repo misa-stack/rpm-build --name zen-browser-rpm
@@ -59,7 +59,7 @@ These repository installation and update commands are not fully working or verif
 2. `build.sh` installs build dependencies, fetches the selected Zen source release and compiles the browser using Zen's Surfer tooling and Mozilla's mach build system.
 3. `zen-browser.spec` packages the locally compiled browser into an RPM using `rpmbuild`.
 4. GitHub Actions uploads the RPM as a build artifact.
-5. `publish.yml` downloads that artifact, generates RPM repository metadata with `createrepo_c` and deploys the repository to GitHub Pages. It can run manually or after a successful manually triggered build.
+5. `publish.yml` downloads both Fedora-specific artifacts, generates separate RPM repository metadata with `createrepo_c`, tests DNF installation in clean Fedora containers, deploys to GitHub Pages and verifies the public repository. It runs after a successful build or manually.
 
 ```text
 Zen source code

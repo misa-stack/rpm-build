@@ -1,6 +1,12 @@
 name: Build Zen Browser RPM
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'build.sh'
+      - 'zen-browser.spec'
   workflow_dispatch:
     inputs:
       version:
@@ -16,6 +22,11 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    name: Build Fedora ${{ matrix.fedora }}
+    strategy:
+      fail-fast: false
+      matrix:
+        fedora: [44, 45]
 
     steps:
       - name: Checkout repository
@@ -31,7 +42,7 @@ jobs:
 
       - name: Compile Zen Browser
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.version || '1.24.3b' }}
         run: |
           mkdir -p out
 
@@ -40,13 +51,13 @@ jobs:
             -e HOST_UID="$(id -u)" \
             -e HOST_GID="$(id -g)" \
             -v "$PWD:/workspace" \
-            registry.fedoraproject.org/fedora:44 \
+            registry.fedoraproject.org/fedora:${{ matrix.fedora }} \
             bash /workspace/build.sh
 
       - name: Upload RPM
         uses: actions/upload-artifact@v4
         with:
-          name: zen-browser-rpm
+          name: zen-browser-rpm-fc${{ matrix.fedora }}
           path: out/*.rpm
           if-no-files-found: error
           retention-days: 30

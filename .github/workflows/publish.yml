@@ -1,0 +1,65 @@
+name: Publish Zen RPM repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful build workflow run ID
+        required: true
+        default: "45840127714"
+        type: string
+  workflow_run:
+    workflows: ["Build Zen Browser RPM"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: zen-rpm-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download built RPM
+        uses: actions/download-artifact@v4
+        with:
+          name: zen-browser-rpm
+          run-id: ${{ inputs.run_id || github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: site/44/x86_64
+
+      - name: Generate DNF repository
+        run: |
+          docker run --rm -v "$PWD/site:/site" registry.fedoraproject.org/fedora:44 \
+            bash -ec 'dnf install -y createrepo_c && createrepo_c /site/44/x86_64'
+          sudo chown -R "$(id -u):$(id -g)" site
+          cat > site/zen-browser.repo <<'EOF'
+          [zen-browser]
+          name=Zen Browser (Unofficial)
+          baseurl=https://misa-stack.github.io/rpm-build/$releasever/$basearch/
+          enabled=1
+          gpgcheck=0
+          repo_gpgcheck=0
+          includepkgs=zen-browser
+          EOF
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

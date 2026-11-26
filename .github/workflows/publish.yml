@@ -54,6 +54,27 @@ jobs:
           includepkgs=zen-browser
           EOF
 
+          test -s site/44/x86_64/repodata/repomd.xml
+          cat > site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Zen Browser RPM repository</title>
+          <main>
+            <h1>Zen Browser RPM repository</h1>
+            <p>Unofficial, unsigned packages for Fedora 44 x86_64.</p>
+            <p><a href="zen-browser.repo">Download DNF repository configuration</a></p>
+            <pre>sudo curl -fsSL https://misa-stack.github.io/rpm-build/zen-browser.repo -o /etc/yum.repos.d/zen-browser.repo
+          sudo dnf install zen-browser
+          sudo dnf upgrade</pre>
+            <p><a href="44/x86_64/repodata/repomd.xml">Repository metadata</a> |
+            <a href="https://github.com/misa-stack/rpm-build">Build scripts on GitHub</a></p>
+            <p>Package and repository signature verification are disabled for this repository.</p>
+          </main>
+          </html>
+          EOF
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

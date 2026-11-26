@@ -1,0 +1,53 @@
+name: Build Zen Browser RPM
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Zen Browser release tag
+        required: true
+        default: "1.24.3b"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          docker image prune -af
+          df -h
+
+      - name: Compile Zen Browser
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p out
+
+          docker run --rm \
+            -e VERSION \
+            -e HOST_UID="$(id -u)" \
+            -e HOST_GID="$(id -g)" \
+            -v "$PWD:/workspace" \
+            registry.fedoraproject.org/fedora:44 \
+            bash /workspace/build.sh
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: zen-browser-rpm
+          path: out/*.rpm
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: Successful build workflow run ID
+        description: Successful build run ID containing Fedora 44 and 45 RPMs
         required: true
-        default: "45840127714"
         type: string
   workflow_run:
     workflows: ["Build Zen Browser RPM"]
@@ -25,24 +24,47 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_repository.full_name == github.repository)
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'workflow_dispatch' || github.event.workflow_run.event == 'push') && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download built RPM
+      - name: Download Fedora 44 RPM
         uses: actions/download-artifact@v4
         with:
-          name: zen-browser-rpm
+          name: zen-browser-rpm-fc44
           run-id: ${{ inputs.run_id || github.event.workflow_run.id }}
           github-token: ${{ github.token }}
           path: site/44/x86_64
 
-      - name: Generate DNF repository
+      - name: Download Fedora 45 RPM
+        uses: actions/download-artifact@v4
+        with:
+          name: zen-browser-rpm-fc45
+          run-id: ${{ inputs.run_id || github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: site/45/x86_64
+
+      - name: Generate and validate DNF repositories
         run: |
-          docker run --rm -v "$PWD/site:/site" registry.fedoraproject.org/fedora:44 \
-            bash -ec 'dnf install -y createrepo_c && createrepo_c /site/44/x86_64'
+          docker run --rm -v "$PWD/site:/site" registry.fedoraproject.org/fedora:44 bash -ec '
+            dnf install -y createrepo_c
+            for release in 44 45; do
+              dir="/site/$release/x86_64"
+              set -- "$dir"/*.rpm
+              test "$#" -eq 1
+              test -s "$1"
+              test "$(rpm -qp --qf "%{NAME} %{ARCH}" "$1")" = "zen-browser x86_64"
+              case "$(rpm -qp --qf "%{RELEASE}" "$1")" in
+                *.fc"$release") ;;
+                *) echo "Wrong Fedora build: $1" >&2; exit 1 ;;
+              esac
+              rpm -K --nosignature "$1"
+              createrepo_c --compress-type gz "$dir"
+              test -s "$dir/repodata/repomd.xml"
+            done
+          '
           sudo chown -R "$(id -u):$(id -g)" site
           cat > site/zen-browser.repo <<'EOF'
           [zen-browser]
@@ -51,10 +73,10 @@ jobs:
           enabled=1
           gpgcheck=0
           repo_gpgcheck=0
+          skip_if_unavailable=0
           includepkgs=zen-browser
           EOF
 
-          test -s site/44/x86_64/repodata/repomd.xml
           cat > site/index.html <<'EOF'
           <!doctype html>
           <html lang="en">
@@ -63,17 +85,31 @@ jobs:
           <title>Zen Browser RPM repository</title>
           <main>
             <h1>Zen Browser RPM repository</h1>
-            <p>Unofficial, unsigned packages for Fedora 44 x86_64.</p>
+            <p>Unofficial, unsigned packages for Fedora 44 and 45 (x86_64).</p>
             <p><a href="zen-browser.repo">Download DNF repository configuration</a></p>
             <pre>sudo curl -fsSL https://misa-stack.github.io/rpm-build/zen-browser.repo -o /etc/yum.repos.d/zen-browser.repo
           sudo dnf install zen-browser
           sudo dnf upgrade</pre>
-            <p><a href="44/x86_64/repodata/repomd.xml">Repository metadata</a> |
-            <a href="https://github.com/misa-stack/rpm-build">Build scripts on GitHub</a></p>
+            <p>Repository metadata: <a href="44/x86_64/repodata/repomd.xml">Fedora 44</a> |
+            <a href="45/x86_64/repodata/repomd.xml">Fedora 45</a></p>
+            <p><a href="https://github.com/misa-stack/rpm-build">Build scripts on GitHub</a></p>
             <p>Package and repository signature verification are disabled for this repository.</p>
           </main>
           </html>
           EOF
+
+      - name: Test repositories locally with DNF
+        run: |
+          for release in 44 45; do
+            docker run --rm -v "$PWD/site/$release/x86_64:/repo:ro" \
+              "registry.fedoraproject.org/fedora:$release" bash -ec '
+                printf "[zen-browser]\nname=Zen Browser\nbaseurl=file:///repo/\nenabled=1\ngpgcheck=0\nrepo_gpgcheck=0\nskip_if_unavailable=0\n" > /etc/yum.repos.d/zen-browser.repo
+                dnf --repo=zen-browser makecache --refresh
+                dnf -y install zen-browser
+                rpm -q zen-browser
+                zen --version
+              '
+          done
 
       - uses: actions/configure-pages@v5
 
@@ -84,3 +120,20 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify public repository metadata and installation
+        run: |
+          base=https://misa-stack.github.io/rpm-build
+          for release in 44 45; do
+            metadata="$release/x86_64/repodata/repomd.xml"
+            curl --fail --silent --show-error --location --retry 10 --retry-all-errors --retry-delay 10 \
+              "$base/$metadata" -o /tmp/repomd.xml
+            cmp "site/$metadata" /tmp/repomd.xml
+            docker run --rm "registry.fedoraproject.org/fedora:$release" bash -ec '
+              curl -fsSL https://misa-stack.github.io/rpm-build/zen-browser.repo -o /etc/yum.repos.d/zen-browser.repo
+              dnf --repo=zen-browser makecache --refresh
+              dnf -y install zen-browser
+              rpm -q zen-browser
+              zen --version
+            '
+          done

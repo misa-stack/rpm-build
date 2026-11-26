@@ -118,7 +118,7 @@ fi
 # Compile and package the browser
 export ZEN_RELEASE=1
 
-npm run build -- --jobs 2
+npm run build -- --jobs 4 
 npm run package
 
 # Prepare RPM source files

@@ -1,4 +1,5 @@
 name: Publish Zen RPM repository
+run-name: Publish build ${{ inputs.run_id || github.event.workflow_run.id }}
 
 on:
   workflow_dispatch:
@@ -50,6 +51,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD/site:/site" registry.fedoraproject.org/fedora:44 bash -ec '
             dnf install -y createrepo_c
+            version=""
             for release in 44 45; do
               dir="/site/$release/x86_64"
               set -- "$dir"/*.rpm
@@ -61,9 +63,14 @@ jobs:
                 *) echo "Wrong Fedora build: $1" >&2; exit 1 ;;
               esac
               rpm -K --nosignature "$1"
+              tag=$(rpm -qp --qf "%{VERSION}" "$1")
+              tag=${tag/\~b/b}
+              if [ -n "$version" ]; then test "$version" = "$tag"; fi
+              version="$tag"
               createrepo_c --compress-type gz "$dir"
               test -s "$dir/repodata/repomd.xml"
             done
+            printf "%s\n" "$version" > /site/version.txt
           '
           sudo chown -R "$(id -u):$(id -g)" site
           cat > site/zen-browser.repo <<'EOF'
@@ -124,6 +131,8 @@ jobs:
       - name: Verify public repository metadata and installation
         run: |
           base=https://misa-stack.github.io/rpm-build
+          curl --fail --silent --show-error --location --retry 10 --retry-all-errors --retry-delay 10 "$base/version.txt" -o /tmp/zen-version.txt
+          cmp site/version.txt /tmp/zen-version.txt
           for release in 44 45; do
             metadata="$release/x86_64/repodata/repomd.xml"
             curl --fail --silent --show-error --location --retry 10 --retry-all-errors --retry-delay 10 \

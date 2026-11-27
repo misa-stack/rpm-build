@@ -10,7 +10,7 @@ set -euo pipefail
 if [[ "$(id -u)" -eq 0 ]]; then
     dnf install -y \
         git curl wget sudo shadow-utils \
-        python3 python3-devel python3-pip \
+        python3 python3-devel python3-pip python3.14 python3.14-devel \
         nodejs22 nodejs22-npm \
         nodejs22-bin nodejs22-npm-bin \
         gcc gcc-c++ make clang clang-devel llvm llvm-devel lld \
@@ -55,6 +55,14 @@ fi
 [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}b?$ ]] || { echo "Invalid Zen release tag: $VERSION" >&2; exit 1; }
 
 cd "$HOME"
+
+# Keep Mach and Surfer on a supported Python without replacing Fedora's system Python.
+mkdir -p "$HOME/.local/zen-build-bin"
+ln -sf /usr/bin/python3.14 "$HOME/.local/zen-build-bin/python3"
+ln -sf /usr/bin/python3.14 "$HOME/.local/zen-build-bin/python"
+export PATH="$HOME/.local/zen-build-bin:$PATH"
+export MACH_PYTHON=/usr/bin/python3.14
+python3 --version
 
 # Download upstream source code
 git clone \
@@ -122,6 +130,11 @@ else
 fi
 
 # Compile and package the browser
+# Prefer the matching Mozilla bootstrap toolchain when available.
+if [[ -x "$HOME/.mozbuild/clang/bin/llvm-config" ]]; then
+    export LLVM_CONFIG="$HOME/.mozbuild/clang/bin/llvm-config"
+    export PATH="$HOME/.mozbuild/clang/bin:$PATH"
+fi
 export ZEN_RELEASE=1
 
 npm run build -- --jobs 4 

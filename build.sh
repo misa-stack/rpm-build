@@ -14,7 +14,7 @@ if [[ "$(id -u)" -eq 0 ]]; then
         nodejs22 nodejs22-npm \
         nodejs22-bin nodejs22-npm-bin \
         gcc gcc-c++ make clang clang-devel llvm llvm-devel lld \
-        nasm yasm m4 sccache \
+        nasm yasm m4 sccache cbindgen \
         gtk3-devel alsa-lib-devel \
         libcurl-devel dbus-devel \
         dbus-glib-devel libdrm-devel \
@@ -29,6 +29,8 @@ if [[ "$(id -u)" -eq 0 ]]; then
 
     command -v llvm-config
     llvm-config --version
+    command -v cbindgen
+    cbindgen --version
     dnf clean all
 
     if ! getent group "$HOST_GID" >/dev/null; then

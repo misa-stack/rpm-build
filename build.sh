@@ -13,7 +13,7 @@ if [[ "$(id -u)" -eq 0 ]]; then
         python3 python3-devel python3-pip \
         nodejs22 nodejs22-npm \
         nodejs22-bin nodejs22-npm-bin \
-        gcc gcc-c++ make clang llvm lld \
+        gcc gcc-c++ make clang clang-devel llvm llvm-devel lld \
         nasm yasm m4 sccache \
         gtk3-devel alsa-lib-devel \
         libcurl-devel dbus-devel \
@@ -27,6 +27,8 @@ if [[ "$(id -u)" -eq 0 ]]; then
         rpm-build rpmdevtools \
         desktop-file-utils
 
+    command -v llvm-config
+    llvm-config --version
     dnf clean all
 
     if ! getent group "$HOST_GID" >/dev/null; then
@@ -47,6 +49,8 @@ if [[ "$(id -u)" -eq 0 ]]; then
         env VERSION="$VERSION" \
         bash /workspace/build.sh
 fi
+
+[[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}b?$ ]] || { echo "Invalid Zen release tag: $VERSION" >&2; exit 1; }
 
 cd "$HOME"
 
